@@ -65,6 +65,8 @@ button:hover {
     margin: 0 auto;
     max-width: 100%;
     aspect-ratio: 1;
+    max-height: 70vh;
+    touch-action: none;
 }
 
 .cell {
@@ -113,35 +115,66 @@ button:hover {
 
 .mobile-controls {
     display: none;
-    margin-top: 20px;
+    margin-top: 30px;
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    z-index: 1000;
 }
 
 .mobile-controls-hint {
     text-align: center;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
     color: #666;
+    font-size: 14px;
 }
 
 .mobile-controls-buttons {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
 }
 
 .horizontal-buttons {
     display: flex;
-    gap: 20px;
+    gap: 40px;
 }
 
 .mobile-controls button {
-    width: 50px;
-    height: 50px;
-    font-size: 24px;
+    width: 70px;
+    height: 70px;
+    font-size: 28px;
     padding: 0;
     display: flex;
     justify-content: center;
     align-items: center;
+    background-color: rgba(76, 175, 80, 0.9);
+    color: white;
+    border-radius: 50%;
+    border: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transition: transform 0.1s, background-color 0.2s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-controls button:active {
+    background-color: rgba(56, 142, 60, 0.9);
+    transform: scale(0.95);
+}
+
+@media (max-width: 480px) {
+    .mobile-controls button {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+    }
+    
+    .horizontal-buttons {
+        gap: 30px;
+    }
 }
 
 .level-select {
@@ -235,6 +268,7 @@ button:hover {
 @media (max-width: 768px) {
     .game-container {
         padding: 10px;
+        margin-bottom: 200px; /* 为移动控制按钮留出空间 */
     }
 
     .mobile-controls {
@@ -247,6 +281,20 @@ button:hover {
 
     .cell {
         font-size: 16px;
+    }
+    
+    .controls {
+        margin-bottom: 5px;
+    }
+    
+    button {
+        padding: 10px 16px;
+        font-size: 16px;
+    }
+    
+    .footer {
+        margin-top: 10px;
+        padding: 8px;
     }
 }
 

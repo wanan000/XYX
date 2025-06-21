@@ -487,6 +487,51 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
+// 添加移动控制按钮事件监听
+document.getElementById('btn-up').addEventListener('click', () => movePlayer(0, -1));
+document.getElementById('btn-down').addEventListener('click', () => movePlayer(0, 1));
+document.getElementById('btn-left').addEventListener('click', () => movePlayer(-1, 0));
+document.getElementById('btn-right').addEventListener('click', () => movePlayer(1, 0));
+
+// 添加触摸控制支持
+let touchStartX = 0;
+let touchStartY = 0;
+
+document.addEventListener('touchstart', function(event) {
+    touchStartX = event.touches[0].clientX;
+    touchStartY = event.touches[0].clientY;
+    event.preventDefault();
+}, {passive: false});
+
+document.addEventListener('touchmove', function(event) {
+    event.preventDefault();
+}, {passive: false});
+
+document.addEventListener('touchend', function(event) {
+    const touchEndX = event.changedTouches[0].clientX;
+    const touchEndY = event.changedTouches[0].clientY;
+    
+    const diffX = touchEndX - touchStartX;
+    const diffY = touchEndY - touchStartY;
+    
+    // 确定滑动方向
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+        // 水平滑动
+        if (diffX > 50) {
+            movePlayer(1, 0); // 右滑
+        } else if (diffX < -50) {
+            movePlayer(-1, 0); // 左滑
+        }
+    } else {
+        // 垂直滑动
+        if (diffY > 50) {
+            movePlayer(0, 1); // 下滑
+        } else if (diffY < -50) {
+            movePlayer(0, -1); // 上滑
+        }
+    }
+}, {passive: false});
+
 // 显示游戏说明
 function showHelp() {
     document.getElementById('help-modal').classList.add('active');
@@ -544,6 +589,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('help-button').addEventListener('click', showHelp);
     document.getElementById('close-help').addEventListener('click', hideHelp);
     
-    // 默认显示关卡选择界面
-    showLevelSelect();
+    // 直接从第一关开始
+    initGame(1);
 });
