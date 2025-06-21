@@ -1,386 +1,549 @@
-class Game2048 {
-    constructor() {
-        this.gridSize = 4;
-        this.grid = [];
-        this.score = 0;
-        this.bestScore = parseInt(localStorage.getItem('bestScore')) || 0;
-        this.gameOver = false;
-        this.won = false;
-        this.moved = false;
-        this.tileContainer = document.getElementById('tile-container');
-        this.scoreDisplay = document.getElementById('score');
-        this.bestScoreDisplay = document.getElementById('best-score');
-        this.gameMessage = document.querySelector('.game-message');
-        this.mobileControls = document.getElementById('mobile-controls');
-        
-        // 检测是否为移动设备
-        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // 初始化游戏
-        this.init();
-        
-        // 绑定事件
-        this.bindEvents();
-        
-        // 如果是移动设备，显示控制提示
-        if (this.isMobile) {
-            this.showMobileControls();
-        }
+// 游戏状态
+let currentLevel = 0; // 设置为0表示尚未选择关卡
+let moves = 0;
+let playerPosition = { x: 0, y: 0 };
+let gameBoard = [];
+let boxPositions = [];
+let targetPositions = [];
+let completedLevels = new Set(); // 跟踪已完成的关卡
+
+// 游戏关卡设计
+const levels = [
+    {
+        layout: [
+            "WWWWWWW",
+            "W  P  W",
+            "W B T W",
+            "W     W",
+            "WWWWWWW"
+        ],
+        width: 7,
+        height: 5
+    },
+    {
+        layout: [
+            "WWWWWWWWW",
+            "W       W",
+            "W BBP   W",
+            "WWW WWW W",
+            "W T T   W",
+            "W       W",
+            "WWWWWWWWW"
+        ],
+        width: 9,
+        height: 7
+    },
+    {
+        layout: [
+            "WWWWWWWWWWW",
+            "W         W",
+            "W WWWWWW  W",
+            "W W    W  W",
+            "W B  P W  W",
+            "W W BB    W",
+            "W W TT W  W",
+            "W W  W W  W",
+            "W WT   W  W",
+            "W         W",
+            "WWWWWWWWWWW"
+        ],
+        width: 11,
+        height: 11
     }
+];
 
-    // 初始化游戏
-    init() {
-        // 清空网格和显示
-        this.grid = Array(this.gridSize).fill().map(() => Array(this.gridSize).fill(0));
-        this.score = 0;
-        this.gameOver = false;
-        this.won = false;
-        this.updateScore();
-        this.tileContainer.innerHTML = '';
-        this.gameMessage.style.display = 'none';
+// 初始化游戏
+function initGame(levelNumber) {
+    // 如果levelNumber为0或无效值，不执行初始化
+    if (levelNumber <= 0 || levelNumber > levels.length) return false;
+    
+    const level = levels[levelNumber - 1];
+    if (!level) return false;
 
-        // 添加初始方块
-        this.addRandomTile();
-        this.addRandomTile();
-    }
+    currentLevel = levelNumber;
+    moves = 0;
+    updateMovesDisplay();
+    document.getElementById('level-number').textContent = currentLevel;
 
-    // 显示移动设备控制提示
-    showMobileControls() {
-        if (this.mobileControls) {
-            // 显示控制提示
-            this.mobileControls.style.display = 'block';
+    // 创建游戏板
+    const gameboardElement = document.getElementById('game-board');
+    gameboardElement.style.gridTemplateColumns = `repeat(${level.width}, 1fr)`;
+    gameboardElement.innerHTML = '';
+    
+    gameBoard = [];
+    boxPositions = [];
+    targetPositions = [];
+
+    // 解析关卡布局
+    level.layout.forEach((row, y) => {
+        gameBoard[y] = [];
+        for (let x = 0; x < row.length; x++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
             
-            // 强制重排以确保过渡效果生效
-            this.mobileControls.offsetHeight;
-            
-            // 淡入效果
-            setTimeout(() => {
-                this.mobileControls.style.opacity = '1';
-                
-                // 5秒后淡出
-                setTimeout(() => {
-                    this.mobileControls.style.opacity = '0';
-                    
-                    // 等待淡出动画完成后隐藏元素
-                    setTimeout(() => {
-                        this.mobileControls.style.display = 'none';
-                    }, 1000);
-                }, 5000);
-            }, 100);
-        }
-    }
-
-    // 绑定事件处理
-    bindEvents() {
-        // 键盘事件
-        document.addEventListener('keydown', (e) => {
-            if (this.gameOver) return;
-
-            let moved = false;
-            switch(e.key) {
-                case 'ArrowUp':
-                case 'w':
+            switch (row[x]) {
                 case 'W':
-                    e.preventDefault();
-                    moved = this.move('up');
+                    cell.classList.add('wall');
+                    gameBoard[y][x] = 'wall';
                     break;
-                case 'ArrowDown':
-                case 's':
-                case 'S':
-                    e.preventDefault();
-                    moved = this.move('down');
+                case 'P':
+                    playerPosition = { x, y };
+                    gameBoard[y][x] = 'empty';
+                    cell.classList.add('player');
                     break;
-                case 'ArrowLeft':
-                case 'a':
-                case 'A':
-                    e.preventDefault();
-                    moved = this.move('left');
+                case 'B':
+                    boxPositions.push({ x, y });
+                    gameBoard[y][x] = 'empty';
+                    cell.classList.add('box');
                     break;
-                case 'ArrowRight':
-                case 'd':
-                case 'D':
-                    e.preventDefault();
-                    moved = this.move('right');
+                case 'T':
+                    targetPositions.push({ x, y });
+                    gameBoard[y][x] = 'empty';
+                    cell.classList.add('target');
                     break;
+                default:
+                    gameBoard[y][x] = 'empty';
             }
+            
+            gameboardElement.appendChild(cell);
+        }
+    });
 
-            if (moved) {
-                this.addRandomTile();
-                this.checkGameStatus();
+    updateGameBoard();
+    return true;
+}
+
+// 更新游戏板显示
+function updateGameBoard() {
+    const cells = document.querySelectorAll('.cell');
+    cells.forEach(cell => {
+        cell.className = 'cell';
+    });
+
+    // 更新墙壁
+    gameBoard.forEach((row, y) => {
+        row.forEach((cell, x) => {
+            if (cell === 'wall') {
+                getCellElement(x, y).classList.add('wall');
             }
         });
+    });
 
-        // 触摸事件处理
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchStartTime = 0;
-        const gameContainer = document.querySelector('.game-container');
+    // 更新目标点
+    targetPositions.forEach(pos => {
+        getCellElement(pos.x, pos.y).classList.add('target');
+    });
 
-        // 游戏容器获得焦点时阻止页面滚动
-        gameContainer.addEventListener('touchstart', (e) => {
-            // 记录开始位置和时间
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            touchStartTime = Date.now();
-            
-            // 在移动设备上，当游戏开始时阻止页面滚动
-            if (this.isMobile) {
-                document.body.classList.add('playing');
-            }
-        }, { passive: false });
-
-        gameContainer.addEventListener('touchmove', (e) => {
-            // 仅在游戏容器内阻止默认滚动行为
-            e.preventDefault();
-        }, { passive: false });
-
-        gameContainer.addEventListener('touchend', (e) => {
-            // 移除playing类，恢复页面滚动
-            if (this.isMobile) {
-                document.body.classList.remove('playing');
-            }
-            
-            if (this.gameOver) return;
-
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
-            const touchEndTime = Date.now();
-            
-            const dx = touchEndX - touchStartX;
-            const dy = touchEndY - touchStartY;
-            const duration = touchEndTime - touchStartTime;
-            
-            // 忽略过短的触摸（可能是点击）或过长的触摸（可能是滚动尝试）
-            if (duration < 50 || duration > 500) return;
-            
-            // 忽略过小的移动（可能是意外触摸）
-            const minSwipeDistance = 30;
-            if (Math.abs(dx) < minSwipeDistance && Math.abs(dy) < minSwipeDistance) return;
-            
-            let moved = false;
-            
-            // 确定滑动方向
-            if (Math.abs(dx) > Math.abs(dy)) {
-                if (dx > 0) {
-                    moved = this.move('right');
-                } else {
-                    moved = this.move('left');
-                }
-            } else {
-                if (dy > 0) {
-                    moved = this.move('down');
-                } else {
-                    moved = this.move('up');
-                }
-            }
-
-            if (moved) {
-                this.addRandomTile();
-                this.checkGameStatus();
-            }
-        });
-
-        // 新游戏按钮
-        document.getElementById('restart').addEventListener('click', () => {
-            this.init();
-        });
-
-        // 重试按钮
-        document.querySelector('.retry-button').addEventListener('click', () => {
-            this.init();
-        });
-    }
-
-    // 添加随机方块
-    addRandomTile() {
-        const emptyCells = [];
-        for (let i = 0; i < this.gridSize; i++) {
-            for (let j = 0; j < this.gridSize; j++) {
-                if (this.grid[i][j] === 0) {
-                    emptyCells.push({x: i, y: j});
-                }
-            }
+    // 更新箱子
+    boxPositions.forEach(pos => {
+        const cell = getCellElement(pos.x, pos.y);
+        cell.classList.add('box');
+        if (isOnTarget(pos)) {
+            cell.classList.add('on-target');
         }
+    });
 
-        if (emptyCells.length > 0) {
-            const {x, y} = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-            const value = Math.random() < 0.9 ? 2 : 4;
-            this.grid[x][y] = value;
-            this.addTile(x, y, value, true);
-        }
+    // 更新玩家
+    getCellElement(playerPosition.x, playerPosition.y).classList.add('player');
+}
+
+// 获取特定位置的单元格元素
+function getCellElement(x, y) {
+    const index = y * levels[currentLevel - 1].width + x;
+    return document.querySelectorAll('.cell')[index];
+}
+
+// 检查位置是否是目标点
+function isOnTarget(position) {
+    return targetPositions.some(target => 
+        target.x === position.x && target.y === position.y
+    );
+}
+
+// 移动玩家
+function movePlayer(dx, dy) {
+    const newX = playerPosition.x + dx;
+    const newY = playerPosition.y + dy;
+
+    // 检查是否可以移动
+    if (gameBoard[newY][newX] === 'wall') return;
+
+    // 检查是否推箱子
+    const boxIndex = boxPositions.findIndex(box => 
+        box.x === newX && box.y === newY
+    );
+
+    if (boxIndex !== -1) {
+        const newBoxX = newX + dx;
+        const newBoxY = newY + dy;
+
+        // 检查箱子是否可以移动
+        if (gameBoard[newBoxY][newBoxX] === 'wall') return;
+        if (boxPositions.some(box => box.x === newBoxX && box.y === newBoxY)) return;
+
+        // 移动箱子
+        boxPositions[boxIndex] = { x: newBoxX, y: newBoxY };
     }
 
-    // 添加方块到DOM
-    addTile(x, y, value, isNew = false) {
-        const tile = document.createElement('div');
-        tile.className = `tile tile-${value}${isNew ? ' tile-new' : ''}`;
-        tile.textContent = value;
-        tile.style.left = (y * (106.25 + 15)) + 'px';
-        tile.style.top = (x * (106.25 + 15)) + 'px';
-        this.tileContainer.appendChild(tile);
-    }
+    // 移动玩家
+    playerPosition = { x: newX, y: newY };
+    moves++;
+    updateMovesDisplay();
+    updateGameBoard();
 
-    // 移动方块
-    move(direction) {
-        let moved = false;
-        const vector = this.getVector(direction);
-        const traversals = this.buildTraversals(vector);
-
-        // 清除所有方块的DOM
-        this.tileContainer.innerHTML = '';
-
-        // 创建新网格用于移动
-        let newGrid = Array(this.gridSize).fill().map(() => Array(this.gridSize).fill(0));
-
-        traversals.x.forEach(x => {
-            traversals.y.forEach(y => {
-                let cell = {x: x, y: y};
-                let value = this.grid[x][y];
-
-                if (value !== 0) {
-                    let positions = this.findFarthestPosition(cell, vector);
-                    let next = this.grid[positions.next.x][positions.next.y];
-
-                    if (next === value && !positions.merged) {
-                        // 合并
-                        let mergedValue = value * 2;
-                        newGrid[positions.next.x][positions.next.y] = mergedValue;
-                        this.score += mergedValue;
-                        this.addTile(positions.next.x, positions.next.y, mergedValue);
-                        positions.merged = true;
-                        moved = true;
-
-                        // 检查是否达到2048
-                        if (mergedValue === 2048 && !this.won) {
-                            this.won = true;
-                        }
-                    } else {
-                        // 移动或保持原位
-                        newGrid[positions.farthest.x][positions.farthest.y] = value;
-                        this.addTile(positions.farthest.x, positions.farthest.y, value);
-                        moved = (x !== positions.farthest.x || y !== positions.farthest.y);
-                    }
-                }
-            });
-        });
-
-        if (moved) {
-            this.grid = newGrid;
-            this.updateScore();
-        }
-
-        return moved;
-    }
-
-    // 获取移动方向向量
-    getVector(direction) {
-        const vectors = {
-            'up': {x: -1, y: 0},
-            'right': {x: 0, y: 1},
-            'down': {x: 1, y: 0},
-            'left': {x: 0, y: -1}
-        };
-        return vectors[direction];
-    }
-
-    // 构建遍历顺序
-    buildTraversals(vector) {
-        let traversals = {
-            x: Array(this.gridSize).fill().map((_, i) => i),
-            y: Array(this.gridSize).fill().map((_, i) => i)
-        };
-
-        if (vector.x === 1) traversals.x.reverse();
-        if (vector.y === 1) traversals.y.reverse();
-
-        return traversals;
-    }
-
-    // 找到最远的可移动位置
-    findFarthestPosition(cell, vector) {
-        let previous;
-        let merged = false;
-
-        do {
-            previous = cell;
-            cell = {
-                x: previous.x + vector.x,
-                y: previous.y + vector.y
-            };
-        } while (this.withinBounds(cell) && this.grid[cell.x][cell.y] === 0);
-
-        if (this.withinBounds(cell) && !merged) {
-            merged = true;
-        } else {
-            cell = previous;
-        }
-
-        return {
-            farthest: previous,
-            next: cell,
-            merged: false
-        };
-    }
-
-    // 检查是否在边界内
-    withinBounds(position) {
-        return position.x >= 0 && position.x < this.gridSize &&
-               position.y >= 0 && position.y < this.gridSize;
-    }
-
-    // 更新分数显示
-    updateScore() {
-        this.scoreDisplay.textContent = this.score;
-        if (this.score > this.bestScore) {
-            this.bestScore = this.score;
-            this.bestScoreDisplay.textContent = this.bestScore;
-            localStorage.setItem('bestScore', this.bestScore);
-        }
-    }
-
-    // 检查游戏状态
-    checkGameStatus() {
-        if (this.won) {
-            this.gameMessage.innerHTML = '<p>你赢了!</p>';
-            this.gameMessage.className = 'game-message game-won';
-            this.gameMessage.style.display = 'flex';
-            this.gameOver = true;
-            return;
-        }
-
-        // 检查是否还有空格
-        for (let i = 0; i < this.gridSize; i++) {
-            for (let j = 0; j < this.gridSize; j++) {
-                if (this.grid[i][j] === 0) return;
-            }
-        }
-
-        // 检查是否还有可以合并的方块
-        for (let i = 0; i < this.gridSize; i++) {
-            for (let j = 0; j < this.gridSize; j++) {
-                const current = this.grid[i][j];
-                const directions = [{x: 0, y: 1}, {x: 1, y: 0}];
-
-                for (let direction of directions) {
-                    const newX = i + direction.x;
-                    const newY = j + direction.y;
-
-                    if (newX < this.gridSize && newY < this.gridSize) {
-                        if (current === this.grid[newX][newY]) return;
-                    }
-                }
-            }
-        }
-
-        // 如果没有可移动的方块，游戏结束
-        this.gameMessage.innerHTML = '<p>游戏结束!</p>';
-        this.gameMessage.className = 'game-message game-over';
-        this.gameMessage.style.display = 'flex';
-        this.gameOver = true;
+    // 检查是否获胜
+    if (checkWin()) {
+        showMessage('恭喜!', '你完成了这一关!');
     }
 }
 
-// 启动游戏
-window.onload = () => {
-    new Game2048();
-};
+// 检查是否获胜
+function checkWin() {
+    const win = boxPositions.every(box => isOnTarget(box));
+    
+    if (win) {
+        // 记录已完成的关卡
+        completedLevels.add(currentLevel);
+        
+        // 保存到localStorage
+        try {
+            localStorage.setItem('completedLevels', JSON.stringify([...completedLevels]));
+        } catch (e) {
+            console.error('Error saving completed levels:', e);
+        }
+        
+        // 检查是否完成所有关卡
+        if (completedLevels.size === levels.length) {
+            // 延迟显示全部通关消息，让玩家先看到箱子都到位的画面
+            setTimeout(() => {
+                showCompletionMessage();
+            }, 500);
+        }
+    }
+    
+    return win;
+}
+
+// 显示全部通关消息和图片
+function showCompletionMessage() {
+    // 创建模态对话框
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    modal.style.display = 'flex';
+    modal.style.flexDirection = 'column';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.zIndex = '1000';
+    
+    // 创建消息容器
+    const messageContainer = document.createElement('div');
+    messageContainer.style.backgroundColor = 'white';
+    messageContainer.style.padding = '20px';
+    messageContainer.style.borderRadius = '10px';
+    messageContainer.style.maxWidth = '80%';
+    messageContainer.style.textAlign = 'center';
+    
+    // 添加消息文本
+    const messageText = document.createElement('h2');
+    messageText.textContent = '还玩？报告发我了吗？';
+    messageText.style.marginBottom = '20px';
+    messageContainer.appendChild(messageText);
+    
+    // 添加图片
+    const image = document.createElement('img');
+    image.src = 'photo.png';
+    image.style.maxWidth = '100%';
+    image.style.maxHeight = '60vh';
+    image.style.marginBottom = '20px';
+    messageContainer.appendChild(image);
+    
+    // 添加按钮
+    const buttonContainer = document.createElement('div');
+    
+    const restartButton = document.createElement('button');
+    restartButton.textContent = '马上就发你';
+    restartButton.style.margin = '10px';
+    restartButton.style.padding = '10px 20px';
+    restartButton.addEventListener('click', function() {
+        document.body.removeChild(modal);
+        // 重置已完成关卡
+        completedLevels.clear();
+        // 回到第一关
+        initGame(1);
+    });
+    
+    const exitButton = document.createElement('button');
+    exitButton.textContent = '写完就发你';
+    exitButton.style.margin = '10px';
+    exitButton.style.padding = '10px 20px';
+    exitButton.addEventListener('click', function() {
+        document.body.removeChild(modal);
+    });
+    
+    buttonContainer.appendChild(restartButton);
+    buttonContainer.appendChild(exitButton);
+    messageContainer.appendChild(buttonContainer);
+    
+    modal.appendChild(messageContainer);
+    document.body.appendChild(modal);
+}
+
+// 更新移动次数显示
+function updateMovesDisplay() {
+    document.getElementById('moves-count').textContent = moves;
+}
+
+// 显示消息
+function showMessage(title, text) {
+    const message = document.getElementById('message');
+    document.getElementById('message-title').textContent = title;
+    document.getElementById('message-text').textContent = text;
+    message.classList.add('active');
+}
+
+// 隐藏消息
+function hideMessage() {
+    const message = document.getElementById('message');
+    message.classList.remove('active');
+}
+
+// 隐藏关卡选择
+function hideLevelSelect() {
+    document.getElementById('level-select').classList.remove('active');
+}
+
+// 显示关卡选择界面
+function showLevelSelect() {
+    const levelSelect = document.getElementById('level-select');
+    levelSelect.classList.add('active');
+    
+    // 清空并重新生成关卡选择网格
+    const levelGrid = document.getElementById('level-grid');
+    levelGrid.innerHTML = '';
+    
+    for (let i = 1; i <= levels.length; i++) {
+        const levelButton = document.createElement('button');
+        levelButton.textContent = i;
+        if (completedLevels.has(i)) {
+            levelButton.classList.add('completed');
+        }
+        levelButton.addEventListener('click', function() {
+            levelSelect.classList.remove('active');
+            initGame(i);
+        });
+        levelGrid.appendChild(levelButton);
+    }
+}
+
+// 跳关功能 - 显示"大为帅不帅"对话框或第三关特殊对话框
+let notHandsomeCount = 0; // 跟踪"不帅"点击次数
+
+function showHandsomeDialog() {
+    // 如果是第三关，直接显示"还玩？报告发我了吗？"对话框
+    if (currentLevel === 3) {
+        showCompletionMessage();
+        return;
+    }
+    
+    // 创建模态对话框
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    modal.style.display = 'flex';
+    modal.style.flexDirection = 'column';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.zIndex = '1000';
+    
+    // 创建消息容器
+    const messageContainer = document.createElement('div');
+    messageContainer.style.backgroundColor = 'white';
+    messageContainer.style.padding = '20px';
+    messageContainer.style.borderRadius = '10px';
+    messageContainer.style.maxWidth = '80%';
+    messageContainer.style.textAlign = 'center';
+    
+    // 添加问题文本
+    const questionText = document.createElement('h2');
+    questionText.textContent = '大为帅不帅？';
+    questionText.style.marginBottom = '20px';
+    messageContainer.appendChild(questionText);
+    
+    // 添加按钮容器
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.justifyContent = 'center';
+    buttonContainer.style.gap = '20px';
+    
+    // 添加"帅"按钮
+    const handsome = document.createElement('button');
+    handsome.textContent = '帅';
+    handsome.style.padding = '10px 20px';
+    handsome.style.fontSize = '16px';
+    handsome.style.transition = 'all 0.3s ease';
+    handsome.style.minWidth = '80px';
+    handsome.addEventListener('click', function() {
+        document.body.removeChild(modal);
+        // 标记当前关卡为已完成
+        completedLevels.add(currentLevel);
+        // 跳到下一关
+        const nextLevel = currentLevel + 1 > levels.length ? 1 : currentLevel + 1;
+        initGame(nextLevel);
+    });
+    
+    // 添加"不帅"按钮
+    const notHandsome = document.createElement('button');
+    notHandsome.textContent = '不帅';
+    notHandsome.style.padding = '10px 20px';
+    notHandsome.style.fontSize = '16px';
+    notHandsome.style.transition = 'all 0.3s ease';
+    notHandsome.style.minWidth = '80px';
+    notHandsome.addEventListener('click', function() {
+        notHandsomeCount++;
+        
+        // 调整按钮大小
+        const handSomeScale = 1 + notHandsomeCount * 0.3;
+        const notHandsomeScale = 1 - notHandsomeCount * 0.2;
+        
+        handsome.style.transform = `scale(${handSomeScale})`;
+        notHandsome.style.transform = `scale(${notHandsomeScale})`;
+        
+        if (notHandsomeCount >= 3) {
+            // 显示"事不过三"消息
+            const warningText = document.createElement('div');
+            warningText.textContent = '事不过三';
+            warningText.style.color = 'red';
+            warningText.style.fontWeight = 'bold';
+            warningText.style.fontSize = '24px';
+            warningText.style.marginTop = '20px';
+            messageContainer.appendChild(warningText);
+            
+            // 替换"不帅"为"帅"
+            notHandsome.textContent = '帅';
+            
+            // 开始倒计时
+            let countdown = 2;
+            const countdownElement = document.createElement('div');
+            countdownElement.textContent = `${countdown}秒后自动选择`;
+            countdownElement.style.marginTop = '10px';
+            messageContainer.appendChild(countdownElement);
+            
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                countdownElement.textContent = `${countdown}秒后自动选择`;
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    // 自动点击"帅"按钮
+                    document.body.removeChild(modal);
+                    // 标记当前关卡为已完成
+                    completedLevels.add(currentLevel);
+                    // 跳到下一关
+                    const nextLevel = currentLevel + 1 > levels.length ? 1 : currentLevel + 1;
+                    initGame(nextLevel);
+                }
+            }, 1000);
+        }
+    });
+    
+    // 将按钮添加到按钮容器
+    buttonContainer.appendChild(handsome);
+    buttonContainer.appendChild(notHandsome);
+    
+    // 将按钮容器添加到消息容器
+    messageContainer.appendChild(buttonContainer);
+    
+    // 将消息容器添加到模态框
+    modal.appendChild(messageContainer);
+    
+    // 将模态框添加到页面
+    document.body.appendChild(modal);
+}
+
+// 添加键盘事件监听
+document.addEventListener('keydown', function(event) {
+    switch(event.key) {
+        case 'ArrowLeft':
+            movePlayer(-1, 0);
+            break;
+        case 'ArrowRight':
+            movePlayer(1, 0);
+            break;
+        case 'ArrowUp':
+            movePlayer(0, -1);
+            break;
+        case 'ArrowDown':
+            movePlayer(0, 1);
+            break;
+    }
+});
+
+// 显示游戏说明
+function showHelp() {
+    document.getElementById('help-modal').classList.add('active');
+}
+
+// 隐藏游戏说明
+function hideHelp() {
+    document.getElementById('help-modal').classList.remove('active');
+}
+
+// 初始化游戏
+document.addEventListener('DOMContentLoaded', function() {
+    // 从localStorage加载已完成的关卡
+    try {
+        const savedLevels = JSON.parse(localStorage.getItem('completedLevels'));
+        if (savedLevels && Array.isArray(savedLevels)) {
+            completedLevels = new Set(savedLevels);
+        }
+    } catch (e) {
+        console.error('Error loading completed levels:', e);
+    }
+    
+    // 添加跳关按钮事件监听
+    document.getElementById('level-button').addEventListener('click', showHandsomeDialog);
+
+    // 添加"下一关"按钮事件监听
+    document.getElementById('next-level').addEventListener('click', function() {
+        hideMessage();
+        const nextLevel = currentLevel + 1 > levels.length ? 1 : currentLevel + 1;
+        initGame(nextLevel);
+    });
+
+    // 添加"返回菜单"按钮事件监听
+    document.getElementById('back-to-menu').addEventListener('click', function() {
+        hideMessage();
+        showLevelSelect();
+    });
+    
+    // 添加"关闭"关卡选择按钮事件监听
+    document.getElementById('close-levels').addEventListener('click', function() {
+        hideLevelSelect();
+        // 不再默认从第一关开始，而是保持当前关卡
+        // 如果当前没有选择关卡（首次进入游戏），则不执行任何操作
+        if (currentLevel > 0) {
+            initGame(currentLevel);
+        }
+    });
+    
+    // 添加"认输"按钮事件监听
+    document.getElementById('restart-button').addEventListener('click', function() {
+        initGame(currentLevel); // 重新开始当前关卡
+    });
+    
+    // 添加"游戏说明"按钮事件监听
+    document.getElementById('help-button').addEventListener('click', showHelp);
+    document.getElementById('close-help').addEventListener('click', hideHelp);
+    
+    // 默认显示关卡选择界面
+    showLevelSelect();
+});
