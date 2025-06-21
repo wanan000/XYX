@@ -488,10 +488,48 @@ document.addEventListener('keydown', function(event) {
 });
 
 // 添加移动控制按钮事件监听
+const mobileButtons = [
+    document.getElementById('btn-up'),
+    document.getElementById('btn-down'),
+    document.getElementById('btn-left'),
+    document.getElementById('btn-right')
+];
+
+mobileButtons.forEach(btn => {
+    if (!btn) return;
+    
+    // 添加触摸事件
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.classList.add('active');
+    });
+
+    btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.classList.remove('active');
+    });
+
+    // 保留点击事件
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.classList.add('active');
+        setTimeout(() => btn.classList.remove('active'), 200);
+    });
+});
+
 document.getElementById('btn-up').addEventListener('click', () => movePlayer(0, -1));
 document.getElementById('btn-down').addEventListener('click', () => movePlayer(0, 1));
 document.getElementById('btn-left').addEventListener('click', () => movePlayer(-1, 0));
 document.getElementById('btn-right').addEventListener('click', () => movePlayer(1, 0));
+
+// 添加触摸事件
+document.getElementById('btn-up').addEventListener('touchstart', () => movePlayer(0, -1));
+document.getElementById('btn-down').addEventListener('touchstart', () => movePlayer(0, 1));
+document.getElementById('btn-left').addEventListener('touchstart', () => movePlayer(-1, 0));
+document.getElementById('btn-right').addEventListener('touchstart', () => movePlayer(1, 0));
 
 // 添加触摸控制支持
 let touchStartX = 0;
@@ -544,6 +582,15 @@ function hideHelp() {
 
 // 初始化游戏
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM加载完成，开始初始化游戏...');
+    
+    // 验证关卡数据
+    if (!levels || levels.length === 0) {
+        console.error('错误：没有找到关卡数据');
+        alert('游戏初始化失败：缺少关卡数据');
+        return;
+    }
+
     // 从localStorage加载已完成的关卡
     try {
         const savedLevels = JSON.parse(localStorage.getItem('completedLevels'));
@@ -573,8 +620,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 添加"关闭"关卡选择按钮事件监听
     document.getElementById('close-levels').addEventListener('click', function() {
         hideLevelSelect();
-        // 不再默认从第一关开始，而是保持当前关卡
-        // 如果当前没有选择关卡（首次进入游戏），则不执行任何操作
         if (currentLevel > 0) {
             initGame(currentLevel);
         }
@@ -582,13 +627,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 添加"认输"按钮事件监听
     document.getElementById('restart-button').addEventListener('click', function() {
-        initGame(currentLevel); // 重新开始当前关卡
+        initGame(currentLevel);
     });
     
     // 添加"游戏说明"按钮事件监听
     document.getElementById('help-button').addEventListener('click', showHelp);
     document.getElementById('close-help').addEventListener('click', hideHelp);
     
-    // 直接从第一关开始
-    initGame(1);
+    // 初始化第一关
+    try {
+        if (initGame(1)) {
+            console.log('游戏初始化成功');
+        } else {
+            console.error('游戏初始化失败');
+            alert('游戏初始化失败，请刷新页面重试');
+        }
+    } catch (error) {
+        console.error('游戏初始化异常:', error);
+        alert('游戏初始化异常: ' + error.message);
+    }
 });
