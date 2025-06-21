@@ -35,20 +35,27 @@ const levels = [
     },
     {
         layout: [
-            "WWWWWWWWWWW",
-            "W         W",
-            "W WWWWWW  W",
-            "W W    W  W",
-            "W B  P W  W",
-            "W W BB    W",
-            "W W TT W  W",
-            "W W  W W  W",
-            "W WT   W  W",
-            "W         W",
-            "WWWWWWWWWWW"
+            "WWWWWWWWWWWWWWWWWWW",
+            "W                 W",
+            "W    WWWWWWWW    W",
+            "W    W      W    W",
+            "W    W BBBB W    W",
+            "W    W P    W    W",
+            "W    W      W    W",
+            "W    W  T   W    W",
+            "W    WWWW WWW    W",
+            "W       W        W",
+            "W   T   W    T   W",
+            "W       W        W",
+            "W       W        W",
+            "W    WWWW  T     W",
+            "W                W",
+            "W                W",
+            "WWWWWWWWWWWWWWWWWWW"
         ],
-        width: 11,
-        height: 11
+        width: 19,
+        height: 17,
+        description: "第三关：四箱子挑战！"
     }
 ];
 
@@ -64,6 +71,8 @@ function initGame(levelNumber) {
     moves = 0;
     updateMovesDisplay();
     document.getElementById('level-number').textContent = currentLevel;
+    const descElement = document.getElementById('level-description');
+    descElement.textContent = level.description || '';
 
     // 创建游戏板
     const gameboardElement = document.getElementById('game-board');
@@ -93,12 +102,12 @@ function initGame(levelNumber) {
                     break;
                 case 'B':
                     boxPositions.push({ x, y });
-                    gameBoard[y][x] = 'empty';
+                    gameBoard[y][x] = 'box';
                     cell.classList.add('box');
                     break;
                 case 'T':
                     targetPositions.push({ x, y });
-                    gameBoard[y][x] = 'empty';
+                    gameBoard[y][x] = 'target';
                     cell.classList.add('target');
                     break;
                 default:
@@ -120,27 +129,27 @@ function updateGameBoard() {
         cell.className = 'cell';
     });
 
-    // 更新墙壁
+    // 更新所有游戏元素
     gameBoard.forEach((row, y) => {
         row.forEach((cell, x) => {
-            if (cell === 'wall') {
-                getCellElement(x, y).classList.add('wall');
+            const cellElement = getCellElement(x, y);
+            
+            switch (cell) {
+                case 'wall':
+                    cellElement.classList.add('wall');
+                    break;
+                case 'target':
+                    cellElement.classList.add('target');
+                    break;
+                case 'box':
+                    cellElement.classList.add('box');
+                    // 检查箱子是否在目标点上
+                    if (targetPositions.some(t => t.x === x && t.y === y)) {
+                        cellElement.classList.add('on-target');
+                    }
+                    break;
             }
         });
-    });
-
-    // 更新目标点
-    targetPositions.forEach(pos => {
-        getCellElement(pos.x, pos.y).classList.add('target');
-    });
-
-    // 更新箱子
-    boxPositions.forEach(pos => {
-        const cell = getCellElement(pos.x, pos.y);
-        cell.classList.add('box');
-        if (isOnTarget(pos)) {
-            cell.classList.add('on-target');
-        }
     });
 
     // 更新玩家
@@ -150,7 +159,13 @@ function updateGameBoard() {
 // 获取特定位置的单元格元素
 function getCellElement(x, y) {
     const index = y * levels[currentLevel - 1].width + x;
-    return document.querySelectorAll('.cell')[index];
+    const cells = document.querySelectorAll('.cell');
+    console.log(`Getting cell at (${x},${y}), index=${index}, total cells=${cells.length}`);
+    if (index >= cells.length) {
+        console.error(`Invalid cell index: ${index} for position (${x},${y})`);
+        return null;
+    }
+    return cells[index];
 }
 
 // 检查位置是否是目标点
@@ -581,9 +596,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // 添加"认输"按钮事件监听
-    document.getElementById('restart-button').addEventListener('click', function() {
-        initGame(currentLevel); // 重新开始当前关卡
-    });
+        document.getElementById('restart-button').addEventListener('click', function() {
+            initGame(currentLevel); // 重新开始当前关卡
+        });
+    
+        // 添加重置关卡按钮
+        const resetBtn = document.createElement('button');
+        resetBtn.id = 'reset-level';
+        resetBtn.textContent = '重置关卡';
+        resetBtn.style.marginLeft = '10px';
+        resetBtn.style.padding = '8px 16px';
+        resetBtn.style.backgroundColor = '#ff9800';
+        resetBtn.style.color = 'white';
+        resetBtn.style.border = 'none';
+        resetBtn.style.borderRadius = '4px';
+        resetBtn.style.cursor = 'pointer';
+        resetBtn.addEventListener('click', function() {
+            initGame(currentLevel); // 重新开始当前关卡
+        });
+        document.querySelector('.controls').appendChild(resetBtn);
     
     // 添加"游戏说明"按钮事件监听
     document.getElementById('help-button').addEventListener('click', showHelp);
